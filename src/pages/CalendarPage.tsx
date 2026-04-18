@@ -5,6 +5,7 @@ import {
   CATEGORIES, PRIORITIES,
   type Task, type TaskPriority, type TaskCategory,
 } from "@/lib/tasks";
+import DatePicker from "@/components/DatePicker";
 
 const MONTHS_RU = [
   "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
@@ -15,11 +16,12 @@ const DAYS_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 type AddForm = {
   text: string;
   time: string;
+  date: string;
   priority: TaskPriority;
   category: TaskCategory;
 };
 
-const EMPTY_FORM: AddForm = { text: "", time: "", priority: "medium", category: "personal" };
+const makeEmptyForm = (date: string): AddForm => ({ text: "", time: "", date, priority: "medium", category: "personal" });
 
 export default function CalendarPage() {
   const today = new Date();
@@ -29,7 +31,7 @@ export default function CalendarPage() {
   const [selected, setSelected] = useState<string>(todayKey);
   const [allTasks, setAllTasks] = useState<Task[]>(() => getAllTasks());
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<AddForm>(EMPTY_FORM);
+  const [form, setForm] = useState<AddForm>(() => makeEmptyForm(todayKey));
 
   useEffect(() => {
     saveTasks(allTasks);
@@ -66,12 +68,12 @@ export default function CalendarPage() {
       text: form.text.trim(),
       done: false,
       time: form.time,
-      date: selected,
+      date: form.date || selected,
       priority: form.priority,
       category: form.category,
     };
     setAllTasks((prev) => [...prev, newTask]);
-    setForm(EMPTY_FORM);
+    setForm(makeEmptyForm(selected));
     setShowForm(false);
   };
 
@@ -129,7 +131,7 @@ export default function CalendarPage() {
           return (
             <button
               key={key}
-              onClick={() => { setSelected(key); setShowForm(false); }}
+              onClick={() => { setSelected(key); setShowForm(false); setForm(makeEmptyForm(key)); }}
               className={`relative aspect-square rounded-xl flex items-center justify-center text-sm font-medium transition-all
                 ${isSelected ? "bg-foreground text-background" : ""}
                 ${isToday && !isSelected ? "border border-foreground text-foreground" : ""}
@@ -154,7 +156,7 @@ export default function CalendarPage() {
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-semibold text-foreground">{formatSelectedDate()}</p>
           <button
-            onClick={() => { setShowForm(!showForm); }}
+            onClick={() => { setShowForm(!showForm); if (!showForm) setForm(makeEmptyForm(selected)); }}
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             <Icon name={showForm ? "X" : "Plus"} size={13} />
@@ -175,8 +177,12 @@ export default function CalendarPage() {
               className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 transition-colors"
             />
 
-            <div className="flex gap-2">
-              <div className="flex-1">
+            <div className="space-y-2">
+              <div>
+                <label className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium block mb-1">Дата</label>
+                <DatePicker value={form.date} onChange={(d) => setForm({ ...form, date: d })} />
+              </div>
+              <div>
                 <label className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium block mb-1">Время</label>
                 <input
                   type="time"

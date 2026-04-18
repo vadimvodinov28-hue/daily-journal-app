@@ -5,6 +5,7 @@ import {
   CATEGORIES, PRIORITIES,
   type Task, type TaskPriority, type TaskCategory,
 } from "@/lib/tasks";
+import DatePicker from "@/components/DatePicker";
 
 const DAYS_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 const MONTHS_RU = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
@@ -225,17 +226,12 @@ export default function Home() {
           />
 
           {/* Date & time row */}
-          <div className="flex gap-2">
-            <div className="flex-1">
+          <div className="space-y-3">
+            <div>
               <label className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium block mb-1">Дата</label>
-              <input
-                type="date"
-                value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
-                className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground outline-none focus:border-foreground/40 transition-colors"
-              />
+              <DatePicker value={form.date} onChange={(d) => setForm({ ...form, date: d })} />
             </div>
-            <div className="flex-1">
+            <div>
               <label className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium block mb-1">Время</label>
               <input
                 type="time"
