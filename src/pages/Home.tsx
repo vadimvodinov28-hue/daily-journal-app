@@ -1,61 +1,90 @@
 import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
-import { loadFromStorage, saveToStorage } from "@/lib/storage";
+import {
+  getAllTasks, saveTasks, getTasksForDate,
+  CATEGORIES, PRIORITIES,
+  type Task, type TaskPriority, type TaskCategory,
+} from "@/lib/tasks";
 
 const DAYS_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 const MONTHS_RU = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
 
-type Task = { id: number; text: string; done: boolean; time: string };
+const todayDate = new Date();
+const todayKey = todayDate.toISOString().split("T")[0];
 
-const today = new Date();
-const todayKey = `tasks_${today.getFullYear()}_${today.getMonth()}_${today.getDate()}`;
+type AddForm = {
+  text: string;
+  time: string;
+  date: string;
+  priority: TaskPriority;
+  category: TaskCategory;
+};
 
-const DEFAULT_TASKS: Task[] = [
-  { id: 1, text: "Утренняя пробежка", done: false, time: "07:00" },
-  { id: 2, text: "Встреча с командой", done: false, time: "10:00" },
-  { id: 3, text: "Написать отчёт", done: false, time: "14:00" },
-  { id: 4, text: "Позвонить родителям", done: false, time: "19:00" },
-];
+const EMPTY_FORM: AddForm = {
+  text: "",
+  time: "",
+  date: todayKey,
+  priority: "medium",
+  category: "personal",
+};
 
 export default function Home() {
-  const [tasks, setTasks] = useState<Task[]>(() =>
-    loadFromStorage<Task[]>(todayKey, DEFAULT_TASKS)
+  const [allTasks, setAllTasks] = useState<Task[]>(() => getAllTasks());
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState<AddForm>(EMPTY_FORM);
+  const [filterCat, setFilterCat] = useState<TaskCategory | "all">("all");
+
+  const tasks = getTasksForDate(todayKey).filter(
+    (t) => allTasks.find((a) => a.id === t.id)
   );
-  const [newTask, setNewTask] = useState("");
-  const [newTime, setNewTime] = useState("");
-  const [showTimeInput, setShowTimeInput] = useState(false);
+  const syncedTasks = allTasks.filter((t) => t.date === todayKey);
 
   useEffect(() => {
-    saveToStorage(todayKey, tasks);
-  }, [tasks]);
+    saveTasks(allTasks);
+  }, [allTasks]);
 
-  const dayName = DAYS_RU[today.getDay()];
-  const dateStr = `${today.getDate()} ${MONTHS_RU[today.getMonth()]} ${today.getFullYear()}`;
+  const dayName = DAYS_RU[todayDate.getDay()];
+  const dateStr = `${todayDate.getDate()} ${MONTHS_RU[todayDate.getMonth()]} ${todayDate.getFullYear()}`;
 
   const toggle = (id: number) =>
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
-
-  const addTask = () => {
-    if (!newTask.trim()) return;
-    setTasks((prev) => [
-      ...prev,
-      { id: Date.now(), text: newTask.trim(), done: false, time: newTime },
-    ]);
-    setNewTask("");
-    setNewTime("");
-    setShowTimeInput(false);
-  };
+    setAllTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
 
   const removeTask = (id: number) =>
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    setAllTasks((prev) => prev.filter((t) => t.id !== id));
 
-  const done = tasks.filter((t) => t.done).length;
-  const progress = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+  const addTask = () => {
+    if (!form.text.trim()) return;
+    const newTask: Task = {
+      id: Date.now(),
+      text: form.text.trim(),
+      done: false,
+      time: form.time,
+      date: form.date,
+      priority: form.priority,
+      category: form.category,
+    };
+    setAllTasks((prev) => [...prev, newTask]);
+    setForm(EMPTY_FORM);
+    setShowForm(false);
+  };
+
+  const displayTasks = syncedTasks.filter(
+    (t) => filterCat === "all" || t.category === filterCat
+  ).sort((a, b) => {
+    const order: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 };
+    return order[a.priority] - order[b.priority];
+  });
+
+  const done = syncedTasks.filter((t) => t.done).length;
+  const progress = syncedTasks.length ? Math.round((done / syncedTasks.length) * 100) : 0;
+
+  const getCatMeta = (v: TaskCategory) => CATEGORIES.find((c) => c.value === v)!;
+  const getPrioMeta = (v: TaskPriority) => PRIORITIES.find((p) => p.value === v)!;
 
   return (
     <div className="px-6 py-8 max-w-lg mx-auto animate-fade-in">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <p className="text-muted-foreground text-sm font-medium tracking-wide uppercase mb-1">
           {dayName}
         </p>
@@ -65,10 +94,10 @@ export default function Home() {
       </div>
 
       {/* Progress */}
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-muted-foreground">Выполнено задач</span>
-          <span className="text-sm font-semibold text-foreground">{done}/{tasks.length}</span>
+          <span className="text-sm text-muted-foreground">Выполнено</span>
+          <span className="text-sm font-semibold text-foreground">{done}/{syncedTasks.length}</span>
         </div>
         <div className="h-1 bg-muted rounded-full overflow-hidden">
           <div
@@ -78,87 +107,206 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Tasks */}
-      <div className="space-y-2 mb-8">
-        {tasks.map((task, i) => (
-          <div
-            key={task.id}
-            className="flex items-center gap-4 p-4 bg-card border border-border rounded-xl hover:border-foreground/30 transition-all group animate-slide-up"
-            style={{ animationDelay: `${i * 60}ms` }}
+      {/* Category filter */}
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-1 scrollbar-hide">
+        <button
+          onClick={() => setFilterCat("all")}
+          className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+            filterCat === "all"
+              ? "bg-foreground text-background border-foreground"
+              : "bg-card border-border text-muted-foreground hover:border-foreground/30"
+          }`}
+        >
+          Все
+        </button>
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat.value}
+            onClick={() => setFilterCat(cat.value)}
+            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+              filterCat === cat.value
+                ? "bg-foreground text-background border-foreground"
+                : "bg-card border-border text-muted-foreground hover:border-foreground/30"
+            }`}
           >
-            <button
-              onClick={() => toggle(task.id)}
-              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                task.done
-                  ? "bg-foreground border-foreground"
-                  : "border-border group-hover:border-foreground/50"
-              }`}
+            <span>{cat.emoji}</span>
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tasks */}
+      <div className="space-y-2 mb-6">
+        {displayTasks.map((task, i) => {
+          const cat = getCatMeta(task.category);
+          const prio = getPrioMeta(task.priority);
+          return (
+            <div
+              key={task.id}
+              className="flex items-center gap-3 p-4 bg-card border border-border rounded-xl hover:border-foreground/30 transition-all group animate-slide-up"
+              style={{ animationDelay: `${i * 50}ms` }}
             >
-              {task.done && <Icon name="Check" size={11} className="text-background" />}
-            </button>
-            <div className="flex-1 cursor-pointer" onClick={() => toggle(task.id)}>
-              <p
-                className={`text-sm font-medium transition-all ${
-                  task.done ? "line-through text-muted-foreground" : "text-foreground"
+              {/* Priority dot */}
+              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${prio.dot}`} />
+
+              {/* Checkbox */}
+              <button
+                onClick={() => toggle(task.id)}
+                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                  task.done
+                    ? "bg-foreground border-foreground"
+                    : "border-border group-hover:border-foreground/50"
                 }`}
               >
-                {task.text}
-              </p>
-            </div>
-            {task.time && (
-              <span className="text-xs text-muted-foreground font-medium">{task.time}</span>
-            )}
-            <button
-              onClick={() => removeTask(task.id)}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-all"
-            >
-              <Icon name="X" size={13} />
-            </button>
-          </div>
-        ))}
+                {task.done && <Icon name="Check" size={10} className="text-background" />}
+              </button>
 
-        {tasks.length === 0 && (
+              {/* Content */}
+              <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggle(task.id)}>
+                <p className={`text-sm font-medium transition-all truncate ${
+                  task.done ? "line-through text-muted-foreground" : "text-foreground"
+                }`}>
+                  {task.text}
+                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${cat.color}`}>
+                    {cat.emoji} {cat.label}
+                  </span>
+                  {task.time && (
+                    <span className="text-[10px] text-muted-foreground">{task.time}</span>
+                  )}
+                  {task.date !== todayKey && (
+                    <span className="text-[10px] text-muted-foreground">
+                      {task.date.split("-").reverse().join(".")}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <button
+                onClick={() => removeTask(task.id)}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-all flex-shrink-0"
+              >
+                <Icon name="X" size={13} />
+              </button>
+            </div>
+          );
+        })}
+
+        {displayTasks.length === 0 && (
           <div className="py-8 text-center text-muted-foreground text-sm">
             Задач нет — отличный день!
           </div>
         )}
       </div>
 
-      {/* Add Task */}
-      <div className="space-y-2">
-        <div className="flex gap-2">
+      {/* Add button */}
+      {!showForm && (
+        <button
+          onClick={() => setShowForm(true)}
+          className="w-full flex items-center gap-3 p-4 bg-card border border-dashed border-border rounded-xl text-muted-foreground hover:border-foreground/40 hover:text-foreground transition-all"
+        >
+          <Icon name="Plus" size={16} />
+          <span className="text-sm">Добавить задачу</span>
+        </button>
+      )}
+
+      {/* Add form */}
+      {showForm && (
+        <div className="bg-card border border-border rounded-2xl p-5 space-y-4 animate-scale-in">
           <input
+            autoFocus
             type="text"
-            value={newTask}
-            onChange={(e) => setNewTask(e.target.value)}
+            value={form.text}
+            onChange={(e) => setForm({ ...form, text: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && addTask()}
-            placeholder="Добавить задачу..."
-            className="flex-1 bg-card border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 transition-colors"
+            placeholder="Название задачи..."
+            className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 transition-colors"
           />
-          <button
-            onClick={() => setShowTimeInput(!showTimeInput)}
-            className={`w-12 h-12 border rounded-xl flex items-center justify-center transition-all flex-shrink-0 ${
-              showTimeInput ? "bg-foreground text-background border-foreground" : "bg-card border-border text-muted-foreground hover:border-foreground/40"
-            }`}
-          >
-            <Icon name="Clock" size={16} />
-          </button>
-          <button
-            onClick={addTask}
-            className="w-12 h-12 bg-foreground text-background rounded-xl flex items-center justify-center hover:opacity-80 transition-opacity flex-shrink-0"
-          >
-            <Icon name="Plus" size={18} />
-          </button>
+
+          {/* Date & time row */}
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium block mb-1">Дата</label>
+              <input
+                type="date"
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground outline-none focus:border-foreground/40 transition-colors"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium block mb-1">Время</label>
+              <input
+                type="time"
+                value={form.time}
+                onChange={(e) => setForm({ ...form, time: e.target.value })}
+                className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground outline-none focus:border-foreground/40 transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium block mb-2">Тип</label>
+            <div className="grid grid-cols-4 gap-2">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat.value}
+                  type="button"
+                  onClick={() => setForm({ ...form, category: cat.value })}
+                  className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-xs font-medium transition-all ${
+                    form.category === cat.value
+                      ? "bg-foreground text-background border-foreground"
+                      : "bg-background border-border text-muted-foreground hover:border-foreground/30"
+                  }`}
+                >
+                  <span className="text-base">{cat.emoji}</span>
+                  <span className={form.category === cat.value ? "text-background" : ""}>{cat.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Priority */}
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium block mb-2">Приоритет</label>
+            <div className="flex gap-2">
+              {PRIORITIES.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => setForm({ ...form, priority: p.value })}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border text-xs font-medium transition-all ${
+                    form.priority === p.value
+                      ? "bg-foreground text-background border-foreground"
+                      : "bg-background border-border text-muted-foreground hover:border-foreground/30"
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${form.priority === p.value ? "bg-background" : p.dot}`} />
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={addTask}
+              className="flex-1 py-2.5 bg-foreground text-background rounded-xl text-sm font-medium hover:opacity-80 transition-opacity"
+            >
+              Добавить
+            </button>
+            <button
+              onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }}
+              className="flex-1 py-2.5 bg-muted text-foreground rounded-xl text-sm font-medium hover:bg-secondary transition-colors"
+            >
+              Отмена
+            </button>
+          </div>
         </div>
-        {showTimeInput && (
-          <input
-            type="time"
-            value={newTime}
-            onChange={(e) => setNewTime(e.target.value)}
-            className="w-full bg-card border border-border rounded-xl px-4 py-2.5 text-sm text-foreground outline-none focus:border-foreground/40 transition-colors animate-fade-in"
-          />
-        )}
-      </div>
+      )}
 
       {/* Quote */}
       <div className="mt-8 pt-6 border-t border-border">
