@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import {
-  getAllTasks, saveTasks, getTasksForDate,
-  CATEGORIES, PRIORITIES,
+  getAllTasks, saveTasks,
+  CATEGORIES,
   type Task, type TaskPriority, type TaskCategory,
 } from "@/lib/tasks";
 import DatePicker from "@/components/DatePicker";
+import TaskList from "@/components/TaskList";
 
 const DAYS_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 const MONTHS_RU = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
@@ -137,68 +138,14 @@ export default function Home() {
       </div>
 
       {/* Tasks */}
-      <div className="space-y-2 mb-6">
-        {displayTasks.map((task, i) => {
-          const cat = getCatMeta(task.category);
-          const prio = getPrioMeta(task.priority);
-          return (
-            <div
-              key={task.id}
-              className="flex items-center gap-3 p-4 bg-card border border-border rounded-xl hover:border-foreground/30 transition-all group animate-slide-up"
-              style={{ animationDelay: `${i * 50}ms` }}
-            >
-              {/* Priority dot */}
-              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${prio.dot}`} />
-
-              {/* Checkbox */}
-              <button
-                onClick={() => toggle(task.id)}
-                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                  task.done
-                    ? "bg-foreground border-foreground"
-                    : "border-border group-hover:border-foreground/50"
-                }`}
-              >
-                {task.done && <Icon name="Check" size={10} className="text-background" />}
-              </button>
-
-              {/* Content */}
-              <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggle(task.id)}>
-                <p className={`text-sm font-medium transition-all truncate ${
-                  task.done ? "line-through text-muted-foreground" : "text-foreground"
-                }`}>
-                  {task.text}
-                </p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${cat.color}`}>
-                    {cat.emoji} {cat.label}
-                  </span>
-                  {task.time && (
-                    <span className="text-[10px] text-muted-foreground">{task.time}</span>
-                  )}
-                  {task.date !== todayKey && (
-                    <span className="text-[10px] text-muted-foreground">
-                      {task.date.split("-").reverse().join(".")}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <button
-                onClick={() => removeTask(task.id)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-all flex-shrink-0"
-              >
-                <Icon name="X" size={13} />
-              </button>
-            </div>
-          );
-        })}
-
-        {displayTasks.length === 0 && (
-          <div className="py-8 text-center text-muted-foreground text-sm">
-            Задач нет — отличный день!
-          </div>
-        )}
+      <div className="mb-6">
+        <TaskList
+          tasks={displayTasks}
+          todayKey={todayKey}
+          onToggle={toggle}
+          onRemove={removeTask}
+          previewCount={1}
+        />
       </div>
 
       {/* Add button */}

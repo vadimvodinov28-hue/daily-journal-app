@@ -6,6 +6,7 @@ import {
   type Task, type TaskPriority, type TaskCategory,
 } from "@/lib/tasks";
 import DatePicker from "@/components/DatePicker";
+import TaskList from "@/components/TaskList";
 
 const MONTHS_RU = [
   "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
@@ -434,61 +435,13 @@ export default function CalendarPage() {
         )}
 
         {/* Task list */}
-        {dayTasks.length > 0 ? (
-          <div className="space-y-2">
-            {dayTasks
-              .sort((a, b) => {
-                const order: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 };
-                return order[a.priority] - order[b.priority];
-              })
-              .map((task) => {
-                const cat = getCatMeta(task.category);
-                const prio = getPrioMeta(task.priority);
-                return (
-                  <div
-                    key={task.id}
-                    className="flex items-center gap-3 p-3 bg-card border border-border rounded-xl group hover:border-foreground/20 transition-all"
-                  >
-                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${prio.dot}`} />
-                    <button
-                      onClick={() => toggleTask(task.id)}
-                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                        task.done ? "bg-foreground border-foreground" : "border-border"
-                      }`}
-                    >
-                      {task.done && <Icon name="Check" size={10} className="text-background" />}
-                    </button>
-                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleTask(task.id)}>
-                      <p className={`text-sm font-medium truncate ${task.done ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                        {task.text}
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${cat.color}`}>
-                          {cat.emoji} {cat.label}
-                        </span>
-                        {task.time && (
-                          <span className="text-[10px] text-muted-foreground">{task.time}</span>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => removeTask(task.id)}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-all flex-shrink-0"
-                    >
-                      <Icon name="X" size={13} />
-                    </button>
-                  </div>
-                );
-              })}
-          </div>
-        ) : !showForm ? (
-          <div
-            className="p-4 bg-muted rounded-xl text-center cursor-pointer hover:bg-secondary transition-colors"
-            onClick={() => setShowForm(true)}
-          >
-            <p className="text-sm text-muted-foreground">Задач нет — нажми, чтобы добавить</p>
-          </div>
-        ) : null}
+        <TaskList
+          tasks={dayTasks}
+          onToggle={toggleTask}
+          onRemove={removeTask}
+          previewCount={1}
+          emptyText={showForm ? "" : "Задач нет — нажми «Добавить»"}
+        />
       </div>
     </div>
   );
