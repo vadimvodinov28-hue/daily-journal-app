@@ -36,9 +36,6 @@ export default function Home() {
   const [form, setForm] = useState<AddForm>(EMPTY_FORM);
   const [filterCat, setFilterCat] = useState<TaskCategory | "all">("all");
 
-  const tasks = getTasksForDate(todayKey).filter(
-    (t) => allTasks.find((a) => a.id === t.id)
-  );
   const syncedTasks = allTasks.filter((t) => t.date === todayKey);
 
   useEffect(() => {
