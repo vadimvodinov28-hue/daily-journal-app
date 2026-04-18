@@ -23,6 +23,21 @@ type AddForm = {
 
 const makeEmptyForm = (date: string): AddForm => ({ text: "", time: "", date, priority: "medium", category: "personal" });
 
+const DAYS_FULL = ["Воскресенье","Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"];
+const MONTHS_SHORT = ["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
+
+function getWeekDays(fromDate: string): string[] {
+  const base = new Date(fromDate + "T00:00:00");
+  const day = base.getDay();
+  const monday = new Date(base);
+  monday.setDate(base.getDate() - (day === 0 ? 6 : day - 1));
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d.toISOString().split("T")[0];
+  });
+}
+
 export default function CalendarPage() {
   const today = new Date();
   const todayKey = today.toISOString().split("T")[0];
@@ -31,6 +46,7 @@ export default function CalendarPage() {
   const [selected, setSelected] = useState<string>(todayKey);
   const [allTasks, setAllTasks] = useState<Task[]>(() => getAllTasks());
   const [showForm, setShowForm] = useState(false);
+  const [showWeek, setShowWeek] = useState(false);
   const [form, setForm] = useState<AddForm>(() => makeEmptyForm(todayKey));
 
   useEffect(() => {
@@ -94,7 +110,18 @@ export default function CalendarPage() {
           <h1 className="font-display text-4xl text-foreground">{MONTHS_RU[month]}</h1>
           <p className="text-muted-foreground text-sm mt-0.5">{year}</p>
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => setShowWeek(!showWeek)}
+            className={`flex items-center gap-1.5 px-3 h-9 rounded-lg border text-xs font-medium transition-all ${
+              showWeek
+                ? "bg-foreground text-background border-foreground"
+                : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+            }`}
+          >
+            <Icon name="LayoutList" size={13} />
+            Неделя
+          </button>
           <button
             onClick={() => setCurrent(new Date(year, month - 1, 1))}
             className="w-9 h-9 rounded-lg border border-border flex items-center justify-center hover:bg-secondary transition-colors"
@@ -109,6 +136,82 @@ export default function CalendarPage() {
           </button>
         </div>
       </div>
+
+      {/* Week view */}
+      {showWeek && (
+        <div className="mb-6 animate-fade-in">
+          <div className="flex items-center gap-2 mb-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+              Неделя с {(() => {
+                const days = getWeekDays(selected);
+                const [,m,d] = days[0].split("-");
+                return `${Number(d)} ${MONTHS_SHORT[Number(m)-1]}`;
+              })()}
+            </p>
+          </div>
+          <div className="space-y-1">
+            {getWeekDays(selected).map((dateKey) => {
+              const tasks = allTasks.filter((t) => t.date === dateKey);
+              const [,m,d] = dateKey.split("-");
+              const dayOfWeek = new Date(dateKey + "T00:00:00").getDay();
+              const isToday = dateKey === todayKey;
+              const isSelected = dateKey === selected;
+              return (
+                <div key={dateKey}>
+                  <button
+                    onClick={() => { setSelected(dateKey); setShowWeek(false); setShowForm(false); setForm(makeEmptyForm(dateKey)); }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left group ${
+                      isSelected ? "bg-foreground text-background" : "hover:bg-secondary"
+                    }`}
+                  >
+                    <div className={`w-8 text-center flex-shrink-0 ${isSelected ? "text-background" : isToday ? "text-accent" : "text-muted-foreground"}`}>
+                      <div className="text-[10px] font-medium uppercase">{DAYS_FULL[dayOfWeek].slice(0,2)}</div>
+                      <div className={`text-base font-bold leading-tight ${isToday && !isSelected ? "text-foreground" : ""}`}>{Number(d)}</div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {tasks.length === 0 ? (
+                        <p className={`text-xs ${isSelected ? "text-background/60" : "text-muted-foreground"}`}>Нет задач</p>
+                      ) : (
+                        <div className="space-y-0.5">
+                          {tasks.slice(0, 3).map((t) => {
+                            const cat = CATEGORIES.find((c) => c.value === t.category)!;
+                            const prio = PRIORITIES.find((p) => p.value === t.priority)!;
+                            return (
+                              <div key={t.id} className="flex items-center gap-1.5">
+                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isSelected ? "bg-background/60" : prio.dot}`} />
+                                <span className={`text-xs truncate ${t.done ? "line-through opacity-50" : ""} ${isSelected ? "text-background" : "text-foreground"}`}>
+                                  {t.text}
+                                </span>
+                                {t.time && (
+                                  <span className={`text-[10px] flex-shrink-0 ${isSelected ? "text-background/60" : "text-muted-foreground"}`}>{t.time}</span>
+                                )}
+                                <span className="text-[10px] flex-shrink-0">{cat.emoji}</span>
+                              </div>
+                            );
+                          })}
+                          {tasks.length > 3 && (
+                            <p className={`text-[10px] ${isSelected ? "text-background/60" : "text-muted-foreground"}`}>
+                              +{tasks.length - 3} ещё
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <Icon
+                      name="Plus"
+                      size={13}
+                      className={`flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ${isSelected ? "text-background" : "text-muted-foreground"}`}
+                    />
+                  </button>
+                  {dateKey !== getWeekDays(selected)[6] && (
+                    <div className="h-px bg-border mx-3" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Days header */}
       <div className="grid grid-cols-7 mb-2">
