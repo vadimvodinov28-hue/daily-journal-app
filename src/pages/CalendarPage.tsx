@@ -79,6 +79,12 @@ export default function CalendarPage() {
   const removeTask = (id: number) =>
     setAllTasks((prev) => prev.filter((t) => t.id !== id));
 
+  const editTask = (id: number, fields: Partial<Task>) =>
+    setAllTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...fields } : t)));
+
+  const reorderTasks = (reordered: Task[]) =>
+    setAllTasks(reordered);
+
   const addTask = () => {
     if (!form.text.trim()) return;
     const newTask: Task = {
@@ -439,6 +445,8 @@ export default function CalendarPage() {
           tasks={dayTasks}
           onToggle={toggleTask}
           onRemove={removeTask}
+          onEdit={editTask}
+          onReorder={reorderTasks}
           previewCount={1}
           emptyText={showForm ? "" : "Задач нет — нажми «Добавить»"}
         />

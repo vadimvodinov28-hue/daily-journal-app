@@ -1,12 +1,24 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Icon from "@/components/ui/icon";
-import { CATEGORIES, PRIORITIES, type Task, type TaskPriority } from "@/lib/tasks";
+import {
+  CATEGORIES, PRIORITIES,
+  type Task, type TaskPriority, type TaskCategory,
+} from "@/lib/tasks";
+
+interface EditFormState {
+  text: string;
+  time: string;
+  priority: TaskPriority;
+  category: TaskCategory;
+}
 
 interface Props {
   tasks: Task[];
   todayKey?: string;
   onToggle: (id: number) => void;
   onRemove: (id: number) => void;
+  onEdit: (id: number, fields: Partial<Task>) => void;
+  onReorder: (tasks: Task[]) => void;
   emptyText?: string;
   previewCount?: number;
 }
@@ -16,11 +28,19 @@ export default function TaskList({
   todayKey,
   onToggle,
   onRemove,
+  onEdit,
+  onReorder,
   emptyText = "Задач нет — отличный день!",
   previewCount = 1,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<EditFormState>({ text: "", time: "", priority: "medium", category: "personal" });
+  const dragItem = useRef<number | null>(null);
+  const dragOver = useRef<number | null>(null);
 
+  // Do NOT auto-sort when we have manual order (drag support)
+  // Sort only initially (by priority) but allow reorder override
   const sorted = [...tasks].sort((a, b) => {
     const order: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 };
     return order[a.priority] - order[b.priority];
@@ -30,11 +50,40 @@ export default function TaskList({
   const hiddenCount = sorted.length - previewCount;
   const doneHidden = sorted.slice(previewCount).filter((t) => t.done).length;
 
+  const startEdit = (task: Task) => {
+    setEditingId(task.id);
+    setEditForm({ text: task.text, time: task.time, priority: task.priority, category: task.category });
+  };
+
+  const saveEdit = (id: number) => {
+    if (editForm.text.trim()) {
+      onEdit(id, { text: editForm.text.trim(), time: editForm.time, priority: editForm.priority, category: editForm.category });
+    }
+    setEditingId(null);
+  };
+
+  // Drag & drop handlers
+  const handleDragStart = (idx: number) => { dragItem.current = idx; };
+  const handleDragEnter = (idx: number) => { dragOver.current = idx; };
+  const handleDragEnd = () => {
+    if (dragItem.current === null || dragOver.current === null || dragItem.current === dragOver.current) {
+      dragItem.current = null;
+      dragOver.current = null;
+      return;
+    }
+    const reordered = [...sorted];
+    const [moved] = reordered.splice(dragItem.current, 1);
+    reordered.splice(dragOver.current, 0, moved);
+    // Merge back: replace tasks in allTasks with reordered
+    const otherTasks = (tasks as Task[]).filter(t => !reordered.find(r => r.id === t.id));
+    onReorder([...otherTasks, ...reordered]);
+    dragItem.current = null;
+    dragOver.current = null;
+  };
+
   if (tasks.length === 0) {
     return (
-      <div className="py-6 text-center text-muted-foreground text-sm">
-        {emptyText}
-      </div>
+      <div className="py-6 text-center text-muted-foreground text-sm">{emptyText}</div>
     );
   }
 
@@ -43,58 +92,152 @@ export default function TaskList({
       {visible.map((task, i) => {
         const cat = CATEGORIES.find((c) => c.value === task.category)!;
         const prio = PRIORITIES.find((p) => p.value === task.priority)!;
+        const isEditing = editingId === task.id;
+
         return (
           <div
             key={task.id}
-            className="flex items-center gap-3 px-3 py-2.5 bg-card border border-border rounded-xl hover:border-foreground/20 transition-all group animate-slide-up"
+            draggable
+            onDragStart={() => handleDragStart(i)}
+            onDragEnter={() => handleDragEnter(i)}
+            onDragEnd={handleDragEnd}
+            onDragOver={(e) => e.preventDefault()}
+            className="bg-card border border-border rounded-xl transition-all group animate-slide-up"
             style={{ animationDelay: `${i * 40}ms` }}
           >
-            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${prio.dot}`} />
-
-            <button
-              onClick={() => onToggle(task.id)}
-              className={`w-4.5 h-4.5 w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                task.done
-                  ? "bg-foreground border-foreground"
-                  : "border-border group-hover:border-foreground/50"
-              }`}
-            >
-              {task.done && <Icon name="Check" size={9} className="text-background" />}
-            </button>
-
-            <div
-              className="flex-1 min-w-0 cursor-pointer flex items-center gap-2"
-              onClick={() => onToggle(task.id)}
-            >
-              <p className={`text-sm font-medium truncate transition-all ${
-                task.done ? "line-through text-muted-foreground" : "text-foreground"
-              }`}>
-                {task.text}
-              </p>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <span className="text-sm leading-none">{cat.emoji}</span>
-                {task.time && (
-                  <span className="text-[10px] text-muted-foreground font-medium">{task.time}</span>
-                )}
-                {todayKey && task.date !== todayKey && (
-                  <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
-                    {task.date.split("-").reverse().slice(0,2).join(".")}
-                  </span>
-                )}
+            {isEditing ? (
+              /* ── Edit form ── */
+              <div className="p-3 space-y-3">
+                <input
+                  autoFocus
+                  value={editForm.text}
+                  onChange={(e) => setEditForm({ ...editForm, text: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === "Enter") saveEdit(task.id); if (e.key === "Escape") setEditingId(null); }}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-foreground/40 transition-colors"
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="time"
+                    value={editForm.time}
+                    onChange={(e) => setEditForm({ ...editForm, time: e.target.value })}
+                    className="bg-background border border-border rounded-lg px-2 py-1.5 text-xs text-foreground outline-none focus:border-foreground/40"
+                  />
+                </div>
+                {/* Category */}
+                <div className="grid grid-cols-4 gap-1.5">
+                  {CATEGORIES.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      onClick={() => setEditForm({ ...editForm, category: c.value })}
+                      className={`flex flex-col items-center gap-0.5 p-1.5 rounded-lg border text-[10px] font-medium transition-all ${
+                        editForm.category === c.value
+                          ? "bg-foreground text-background border-foreground"
+                          : "bg-background border-border text-muted-foreground"
+                      }`}
+                    >
+                      <span>{c.emoji}</span>
+                      <span className={editForm.category === c.value ? "text-background" : ""}>{c.label}</span>
+                    </button>
+                  ))}
+                </div>
+                {/* Priority */}
+                <div className="flex gap-1.5">
+                  {PRIORITIES.map((p) => (
+                    <button
+                      key={p.value}
+                      type="button"
+                      onClick={() => setEditForm({ ...editForm, priority: p.value })}
+                      className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg border text-[11px] font-medium transition-all ${
+                        editForm.priority === p.value
+                          ? "bg-foreground text-background border-foreground"
+                          : "bg-background border-border text-muted-foreground"
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${editForm.priority === p.value ? "bg-background" : p.dot}`} />
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => saveEdit(task.id)}
+                    className="flex-1 py-2 bg-foreground text-background rounded-lg text-xs font-medium hover:opacity-80 transition-opacity"
+                  >
+                    Сохранить
+                  </button>
+                  <button
+                    onClick={() => setEditingId(null)}
+                    className="flex-1 py-2 bg-muted text-foreground rounded-lg text-xs font-medium hover:bg-secondary transition-colors"
+                  >
+                    Отмена
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              /* ── Normal row ── */
+              <div className="flex items-center gap-3 px-3 py-2.5 hover:border-foreground/20">
+                {/* Drag handle */}
+                <div
+                  className="cursor-grab active:cursor-grabbing text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                >
+                  <Icon name="GripVertical" size={14} />
+                </div>
 
-            <button
-              onClick={() => onRemove(task.id)}
-              className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-all flex-shrink-0"
-            >
-              <Icon name="X" size={11} />
-            </button>
+                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${prio.dot}`} />
+
+                <button
+                  onClick={() => onToggle(task.id)}
+                  className={`w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                    task.done ? "bg-foreground border-foreground" : "border-border group-hover:border-foreground/50"
+                  }`}
+                >
+                  {task.done && <Icon name="Check" size={9} className="text-background" />}
+                </button>
+
+                <div
+                  className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer"
+                  onClick={() => onToggle(task.id)}
+                >
+                  <p className={`text-sm font-medium truncate transition-all ${
+                    task.done ? "line-through text-muted-foreground" : "text-foreground"
+                  }`}>
+                    {task.text}
+                  </p>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className="text-sm leading-none">{cat.emoji}</span>
+                    {task.time && (
+                      <span className="text-[10px] text-muted-foreground font-medium">{task.time}</span>
+                    )}
+                    {todayKey && task.date !== todayKey && (
+                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
+                        {task.date.split("-").reverse().slice(0, 2).join(".")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Edit button */}
+                <button
+                  onClick={() => startEdit(task)}
+                  className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-muted transition-all flex-shrink-0"
+                >
+                  <Icon name="Pencil" size={11} />
+                </button>
+
+                <button
+                  onClick={() => onRemove(task.id)}
+                  className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-all flex-shrink-0"
+                >
+                  <Icon name="X" size={11} />
+                </button>
+              </div>
+            )}
           </div>
         );
       })}
 
-      {/* Expand / collapse button */}
+      {/* Expand / collapse */}
       {hiddenCount > 0 && (
         <button
           onClick={() => setExpanded(!expanded)}
@@ -110,24 +253,12 @@ export default function TaskList({
             <div className="flex gap-1 ml-auto">
               {sorted.slice(previewCount, previewCount + 4).map((t) => {
                 const p = PRIORITIES.find((p) => p.value === t.priority)!;
-                return (
-                  <span
-                    key={t.id}
-                    className={`w-1.5 h-1.5 rounded-full ${t.done ? "bg-muted-foreground/30" : p.dot}`}
-                  />
-                );
+                return <span key={t.id} className={`w-1.5 h-1.5 rounded-full ${t.done ? "bg-muted-foreground/30" : p.dot}`} />;
               })}
-              {hiddenCount > 4 && (
-                <span className="text-[10px] text-muted-foreground">+{hiddenCount - 4}</span>
-              )}
+              {hiddenCount > 4 && <span className="text-[10px] text-muted-foreground">+{hiddenCount - 4}</span>}
             </div>
           )}
         </button>
-      )}
-
-      {/* Collapse button when expanded and has more than preview */}
-      {expanded && hiddenCount > 0 && (
-        <div /> // handled above
       )}
     </div>
   );

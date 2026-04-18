@@ -51,6 +51,12 @@ export default function Home() {
   const removeTask = (id: number) =>
     setAllTasks((prev) => prev.filter((t) => t.id !== id));
 
+  const editTask = (id: number, fields: Partial<Task>) =>
+    setAllTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...fields } : t)));
+
+  const reorderTasks = (reordered: Task[]) =>
+    setAllTasks(reordered);
+
   const addTask = () => {
     if (!form.text.trim()) return;
     const newTask: Task = {
@@ -69,16 +75,10 @@ export default function Home() {
 
   const displayTasks = syncedTasks.filter(
     (t) => filterCat === "all" || t.category === filterCat
-  ).sort((a, b) => {
-    const order: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 };
-    return order[a.priority] - order[b.priority];
-  });
+  );
 
   const done = syncedTasks.filter((t) => t.done).length;
   const progress = syncedTasks.length ? Math.round((done / syncedTasks.length) * 100) : 0;
-
-  const getCatMeta = (v: TaskCategory) => CATEGORIES.find((c) => c.value === v)!;
-  const getPrioMeta = (v: TaskPriority) => PRIORITIES.find((p) => p.value === v)!;
 
   return (
     <div className="px-6 py-8 max-w-lg mx-auto animate-fade-in">
@@ -141,6 +141,8 @@ export default function Home() {
           todayKey={todayKey}
           onToggle={toggle}
           onRemove={removeTask}
+          onEdit={editTask}
+          onReorder={reorderTasks}
           previewCount={1}
         />
       </div>
