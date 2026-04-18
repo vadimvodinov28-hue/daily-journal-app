@@ -1,7 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
+import { loadFromStorage, saveToStorage } from "@/lib/storage";
 
-const INITIAL_REMINDERS = [
+const STORAGE_KEY = "reminders_data";
+
+type Reminder = {
+  id: number;
+  title: string;
+  time: string;
+  repeat: string;
+  active: boolean;
+  emoji: string;
+};
+
+const DEFAULT_REMINDERS: Reminder[] = [
   { id: 1, title: "Выпить воды", time: "09:00", repeat: "Каждый день", active: true, emoji: "💧" },
   { id: 2, title: "Проверить почту", time: "10:30", repeat: "По будням", active: true, emoji: "📬" },
   { id: 3, title: "Обед", time: "13:00", repeat: "Каждый день", active: false, emoji: "🥗" },
@@ -11,9 +23,15 @@ const INITIAL_REMINDERS = [
 const REPEAT_OPTIONS = ["Каждый день", "По будням", "По выходным", "Один раз", "По неделям"];
 
 export default function Reminders() {
-  const [reminders, setReminders] = useState(INITIAL_REMINDERS);
+  const [reminders, setReminders] = useState<Reminder[]>(() =>
+    loadFromStorage<Reminder[]>(STORAGE_KEY, DEFAULT_REMINDERS)
+  );
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ title: "", time: "09:00", repeat: "Каждый день" });
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEY, reminders);
+  }, [reminders]);
 
   const toggle = (id: number) =>
     setReminders((prev) => prev.map((r) => (r.id === id ? { ...r, active: !r.active } : r)));
@@ -31,7 +49,7 @@ export default function Reminders() {
     setAdding(false);
   };
 
-  const active = reminders.filter((r) => r.active).length;
+  const activeCount = reminders.filter((r) => r.active).length;
 
   return (
     <div className="px-6 py-8 max-w-lg mx-auto animate-fade-in">
@@ -40,7 +58,7 @@ export default function Reminders() {
         <div>
           <h1 className="font-display text-4xl text-foreground">Напоминания</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {active} активных из {reminders.length}
+            {activeCount} активных из {reminders.length}
           </p>
         </div>
         <button
@@ -62,6 +80,7 @@ export default function Reminders() {
             placeholder="Название..."
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
+            onKeyDown={(e) => e.key === "Enter" && save()}
             className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 transition-colors"
           />
           <div className="flex gap-3">
@@ -103,7 +122,7 @@ export default function Reminders() {
         {reminders.map((r, i) => (
           <div
             key={r.id}
-            className={`flex items-center gap-4 p-4 bg-card border rounded-xl transition-all animate-slide-up ${
+            className={`flex items-center gap-4 p-4 bg-card border rounded-xl transition-all animate-slide-up group ${
               r.active ? "border-border" : "border-border opacity-50"
             }`}
             style={{ animationDelay: `${i * 60}ms` }}
@@ -116,7 +135,6 @@ export default function Reminders() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {/* Toggle */}
               <button
                 onClick={() => toggle(r.id)}
                 className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
@@ -131,13 +149,19 @@ export default function Reminders() {
               </button>
               <button
                 onClick={() => remove(r.id)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-all"
               >
                 <Icon name="Trash2" size={14} />
               </button>
             </div>
           </div>
         ))}
+
+        {reminders.length === 0 && (
+          <div className="py-8 text-center text-muted-foreground text-sm">
+            Напоминаний нет
+          </div>
+        )}
       </div>
     </div>
   );

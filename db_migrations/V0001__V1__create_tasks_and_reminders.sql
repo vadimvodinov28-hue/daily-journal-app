@@ -1,0 +1,19 @@
+
+CREATE TABLE t_p73212382_daily_journal_app.tasks (
+  id SERIAL PRIMARY KEY,
+  text TEXT NOT NULL,
+  done BOOLEAN NOT NULL DEFAULT FALSE,
+  time VARCHAR(10),
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE t_p73212382_daily_journal_app.reminders (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  time VARCHAR(10) NOT NULL,
+  repeat VARCHAR(50) NOT NULL DEFAULT 'Каждый день',
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  emoji VARCHAR(10) DEFAULT '🔔',
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
