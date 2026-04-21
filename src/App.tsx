@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Icon from "@/components/ui/icon";
@@ -10,6 +10,7 @@ import AuthPage from "@/pages/AuthPage";
 import { ThemeProvider } from "@/lib/theme";
 import { getCurrentUser, logout, type User } from "@/lib/auth";
 import { getAllTasks } from "@/lib/tasks";
+import { startNotificationScheduler, stopNotificationScheduler } from "@/lib/notifications";
 
 type Tab = "home" | "calendar" | "reminders" | "settings";
 
@@ -23,6 +24,13 @@ const NAV: { id: Tab; icon: string; label: string }[] = [
 const App = () => {
   const [user, setUser] = useState<User | null>(() => getCurrentUser());
   const [tab, setTab] = useState<Tab>("home");
+
+  useEffect(() => {
+    if (user) {
+      startNotificationScheduler();
+      return () => stopNotificationScheduler();
+    }
+  }, [user]);
 
   const handleAuth = (u: User) => { setUser(u); setTab("home"); };
 

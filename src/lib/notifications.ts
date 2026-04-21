@@ -1,0 +1,110 @@
+import { getAllTasks } from "@/lib/tasks";
+
+let schedulerInterval: ReturnType<typeof setInterval> | null = null;
+let audioContext: AudioContext | null = null;
+
+function playNotificationSound() {
+  try {
+    interface WindowWithWebkit extends Window { webkitAudioContext?: typeof AudioContext; }
+    const AudioCtx = window.AudioContext || (window as WindowWithWebkit).webkitAudioContext;
+    if (!AudioCtx) return;
+    audioContext = new AudioCtx();
+    const ctx = audioContext;
+
+    const playTone = (freq: number, startTime: number, duration: number, gain: number) => {
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(freq, startTime);
+
+      gainNode.gain.setValueAtTime(0, startTime);
+      gainNode.gain.linearRampToValueAtTime(gain, startTime + 0.05);
+      gainNode.gain.linearRampToValueAtTime(0, startTime + duration);
+
+      oscillator.start(startTime);
+      oscillator.stop(startTime + duration);
+    };
+
+    const t = ctx.currentTime;
+    // Мелодия: три восходящих звука
+    playTone(523.25, t + 0.0, 0.3, 0.4);   // C5
+    playTone(659.25, t + 0.35, 0.3, 0.4);  // E5
+    playTone(783.99, t + 0.70, 0.5, 0.5);  // G5
+    playTone(1046.5, t + 1.25, 0.6, 0.4);  // C6
+  } catch (e) {
+    console.warn("Audio playback failed:", e);
+  }
+}
+
+async function requestPermission(): Promise<boolean> {
+  if (!("Notification" in window)) return false;
+  if (Notification.permission === "granted") return true;
+  if (Notification.permission === "denied") return false;
+  const result = await Notification.requestPermission();
+  return result === "granted";
+}
+
+function getAlreadyNotified(): Set<string> {
+  const raw = sessionStorage.getItem("notified_tasks");
+  return raw ? new Set(JSON.parse(raw)) : new Set();
+}
+
+function markNotified(key: string) {
+  const set = getAlreadyNotified();
+  set.add(key);
+  sessionStorage.setItem("notified_tasks", JSON.stringify([...set]));
+}
+
+function checkAndNotify() {
+  const now = new Date();
+  const currentDate = now.toISOString().split("T")[0];
+  const currentHH = String(now.getHours()).padStart(2, "0");
+  const currentMM = String(now.getMinutes()).padStart(2, "0");
+  const currentTime = `${currentHH}:${currentMM}`;
+
+  const tasks = getAllTasks();
+  const notified = getAlreadyNotified();
+
+  for (const task of tasks) {
+    if (task.done) continue;
+    if (task.date !== currentDate) continue;
+    if (task.time !== currentTime) continue;
+
+    const key = `${task.id}_${task.date}_${task.time}`;
+    if (notified.has(key)) continue;
+
+    markNotified(key);
+    playNotificationSound();
+
+    if (Notification.permission === "granted") {
+      new Notification("⏰ Время задачи!", {
+        body: task.text,
+        icon: "/favicon.ico",
+        tag: String(task.id),
+      });
+    }
+  }
+}
+
+export async function startNotificationScheduler() {
+  const granted = await requestPermission();
+  if (!granted) {
+    console.warn("Notification permission not granted");
+  }
+
+  if (schedulerInterval) clearInterval(schedulerInterval);
+
+  checkAndNotify();
+  schedulerInterval = setInterval(checkAndNotify, 30_000);
+}
+
+export function stopNotificationScheduler() {
+  if (schedulerInterval) {
+    clearInterval(schedulerInterval);
+    schedulerInterval = null;
+  }
+}
