@@ -7,6 +7,7 @@ const PUSH_URL = "https://functions.poehali.dev/54f28cce-8e3f-4cba-aca1-e7d83bb0
 let schedulerInterval: ReturnType<typeof setInterval> | null = null;
 let audioContext: AudioContext | null = null;
 let fcmToken: string | null = null;
+const repeatIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
 
 function isNativeApp(): boolean {
   return !!(window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
@@ -122,28 +123,44 @@ async function checkAndNotify() {
     if (notified.has(key)) continue;
 
     markNotified(key);
-    playNotificationSound();
 
-    if (isNativeApp()) {
-      await LocalNotifications.schedule({
-        notifications: [
-          {
-            id: notifId++,
-            title: "⏰ Время задачи!",
-            body: task.text,
-            schedule: { at: new Date(Date.now() + 500) },
-            sound: "default",
-            smallIcon: "ic_launcher",
-          },
-        ],
-      });
-      await sendServerPush("⏰ Время задачи!", task.text);
-    } else if (Notification.permission === "granted") {
-      new Notification("⏰ Время задачи!", {
-        body: task.text,
-        icon: "/favicon.ico",
-        tag: String(task.id),
-      });
+    const fireNotification = async () => {
+      playNotificationSound();
+      if (isNativeApp()) {
+        await LocalNotifications.schedule({
+          notifications: [
+            {
+              id: notifId++,
+              title: "⏰ Время задачи!",
+              body: task.text,
+              schedule: { at: new Date(Date.now() + 500) },
+              sound: "default",
+              smallIcon: "ic_launcher",
+            },
+          ],
+        });
+        await sendServerPush("⏰ Время задачи!", task.text);
+      } else if (Notification.permission === "granted") {
+        new Notification("⏰ Время задачи!", {
+          body: task.text,
+          icon: "/favicon.ico",
+          tag: String(task.id),
+        });
+      }
+    };
+
+    await fireNotification();
+
+    if (!repeatIntervals.has(key)) {
+      const repeat = setInterval(async () => {
+        if (document.visibilityState === "visible") {
+          clearInterval(repeat);
+          repeatIntervals.delete(key);
+          return;
+        }
+        await fireNotification();
+      }, 60_000);
+      repeatIntervals.set(key, repeat);
     }
   }
 }
