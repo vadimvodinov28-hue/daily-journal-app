@@ -1,8 +1,12 @@
 import { getAllTasks } from "@/lib/tasks";
 import { LocalNotifications } from "@capacitor/local-notifications";
+import { PushNotifications } from "@capacitor/push-notifications";
+
+const PUSH_URL = "https://functions.poehali.dev/54f28cce-8e3f-4cba-aca1-e7d83bb04799";
 
 let schedulerInterval: ReturnType<typeof setInterval> | null = null;
 let audioContext: AudioContext | null = null;
+let fcmToken: string | null = null;
 
 function isNativeApp(): boolean {
   return !!(window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
@@ -37,6 +41,40 @@ function playNotificationSound() {
     playTone(1046.5, t + 1.25, 0.6, 0.4);
   } catch (e) {
     console.warn("Audio playback failed:", e);
+  }
+}
+
+async function setupPushNotifications() {
+  if (!isNativeApp()) return;
+
+  const permResult = await PushNotifications.requestPermissions();
+  if (permResult.receive !== "granted") return;
+
+  await PushNotifications.register();
+
+  PushNotifications.addListener("registration", (token) => {
+    fcmToken = token.value;
+    localStorage.setItem("fcm_token", token.value);
+  });
+
+  PushNotifications.addListener("registrationError", (err) => {
+    console.warn("FCM registration error:", err);
+  });
+
+  const savedToken = localStorage.getItem("fcm_token");
+  if (savedToken) fcmToken = savedToken;
+}
+
+async function sendServerPush(title: string, body: string) {
+  if (!fcmToken) return;
+  try {
+    await fetch(PUSH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: fcmToken, title, body }),
+    });
+  } catch (e) {
+    console.warn("Server push failed:", e);
   }
 }
 
@@ -99,6 +137,7 @@ async function checkAndNotify() {
           },
         ],
       });
+      await sendServerPush("⏰ Время задачи!", task.text);
     } else if (Notification.permission === "granted") {
       new Notification("⏰ Время задачи!", {
         body: task.text,
@@ -111,6 +150,7 @@ async function checkAndNotify() {
 
 export async function startNotificationScheduler() {
   await requestPermission();
+  await setupPushNotifications();
   if (schedulerInterval) clearInterval(schedulerInterval);
   checkAndNotify();
   schedulerInterval = setInterval(checkAndNotify, 30_000);
