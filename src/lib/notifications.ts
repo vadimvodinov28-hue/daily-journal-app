@@ -1,7 +1,12 @@
 import { getAllTasks } from "@/lib/tasks";
+import { LocalNotifications } from "@capacitor/local-notifications";
 
 let schedulerInterval: ReturnType<typeof setInterval> | null = null;
 let audioContext: AudioContext | null = null;
+
+function isNativeApp(): boolean {
+  return !!(window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
+}
 
 function playNotificationSound() {
   try {
@@ -14,33 +19,32 @@ function playNotificationSound() {
     const playTone = (freq: number, startTime: number, duration: number, gain: number) => {
       const oscillator = ctx.createOscillator();
       const gainNode = ctx.createGain();
-
       oscillator.connect(gainNode);
       gainNode.connect(ctx.destination);
-
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(freq, startTime);
-
       gainNode.gain.setValueAtTime(0, startTime);
       gainNode.gain.linearRampToValueAtTime(gain, startTime + 0.05);
       gainNode.gain.linearRampToValueAtTime(0, startTime + duration);
-
       oscillator.start(startTime);
       oscillator.stop(startTime + duration);
     };
 
     const t = ctx.currentTime;
-    // Мелодия: три восходящих звука
-    playTone(523.25, t + 0.0, 0.3, 0.4);   // C5
-    playTone(659.25, t + 0.35, 0.3, 0.4);  // E5
-    playTone(783.99, t + 0.70, 0.5, 0.5);  // G5
-    playTone(1046.5, t + 1.25, 0.6, 0.4);  // C6
+    playTone(523.25, t + 0.0, 0.3, 0.4);
+    playTone(659.25, t + 0.35, 0.3, 0.4);
+    playTone(783.99, t + 0.70, 0.5, 0.5);
+    playTone(1046.5, t + 1.25, 0.6, 0.4);
   } catch (e) {
     console.warn("Audio playback failed:", e);
   }
 }
 
 async function requestPermission(): Promise<boolean> {
+  if (isNativeApp()) {
+    const result = await LocalNotifications.requestPermissions();
+    return result.display === "granted";
+  }
   if (!("Notification" in window)) return false;
   if (Notification.permission === "granted") return true;
   if (Notification.permission === "denied") return false;
@@ -59,7 +63,9 @@ function markNotified(key: string) {
   sessionStorage.setItem("notified_tasks", JSON.stringify([...set]));
 }
 
-function checkAndNotify() {
+let notifId = 1000;
+
+async function checkAndNotify() {
   const now = new Date();
   const currentDate = now.toISOString().split("T")[0];
   const currentHH = String(now.getHours()).padStart(2, "0");
@@ -80,7 +86,20 @@ function checkAndNotify() {
     markNotified(key);
     playNotificationSound();
 
-    if (Notification.permission === "granted") {
+    if (isNativeApp()) {
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: notifId++,
+            title: "⏰ Время задачи!",
+            body: task.text,
+            schedule: { at: new Date(Date.now() + 500) },
+            sound: "default",
+            smallIcon: "ic_launcher",
+          },
+        ],
+      });
+    } else if (Notification.permission === "granted") {
       new Notification("⏰ Время задачи!", {
         body: task.text,
         icon: "/favicon.ico",
@@ -91,13 +110,8 @@ function checkAndNotify() {
 }
 
 export async function startNotificationScheduler() {
-  const granted = await requestPermission();
-  if (!granted) {
-    console.warn("Notification permission not granted");
-  }
-
+  await requestPermission();
   if (schedulerInterval) clearInterval(schedulerInterval);
-
   checkAndNotify();
   schedulerInterval = setInterval(checkAndNotify, 30_000);
 }
