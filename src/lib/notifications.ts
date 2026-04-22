@@ -9,6 +9,67 @@ let audioContext: AudioContext | null = null;
 let fcmToken: string | null = null;
 const repeatIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
 
+export type ActiveAlert = {
+  taskId: number;
+  taskText: string;
+  key: string;
+  snoozedUntil?: number;
+};
+
+let activeAlert: ActiveAlert | null = null;
+let onAlertChange: ((alert: ActiveAlert | null) => void) | null = null;
+
+export function subscribeToAlert(cb: (alert: ActiveAlert | null) => void) {
+  onAlertChange = cb;
+  cb(activeAlert);
+  return () => { onAlertChange = null; };
+}
+
+function setActiveAlert(alert: ActiveAlert | null) {
+  activeAlert = alert;
+  onAlertChange?.(alert);
+}
+
+export function stopAlertSound() {
+  if (audioContext) {
+    audioContext.close().catch(() => {});
+    audioContext = null;
+  }
+  if (activeAlert) {
+    const key = activeAlert.key;
+    const interval = repeatIntervals.get(key);
+    if (interval) {
+      clearInterval(interval);
+      repeatIntervals.delete(key);
+    }
+  }
+  setActiveAlert(null);
+}
+
+export function snoozeAlertSound(minutes = 5) {
+  if (!activeAlert) return;
+  const key = activeAlert.key;
+  const interval = repeatIntervals.get(key);
+  if (interval) {
+    clearInterval(interval);
+    repeatIntervals.delete(key);
+  }
+  if (audioContext) {
+    audioContext.close().catch(() => {});
+    audioContext = null;
+  }
+  const snoozedAlert: ActiveAlert = {
+    ...activeAlert,
+    snoozedUntil: Date.now() + minutes * 60_000,
+  };
+  setActiveAlert(null);
+
+  setTimeout(async () => {
+    setActiveAlert(snoozedAlert);
+    await fireNotificationByKey(snoozedAlert.key, snoozedAlert.taskText, snoozedAlert.taskId);
+  }, minutes * 60_000);
+}
+
 function isNativeApp(): boolean {
   return !!(window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
 }
@@ -104,6 +165,32 @@ function markNotified(key: string) {
 
 let notifId = 1000;
 
+async function fireNotificationByKey(key: string, taskText: string, taskId: number) {
+  playNotificationSound();
+  setActiveAlert({ taskId, taskText, key });
+  if (isNativeApp()) {
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: notifId++,
+          title: "⏰ Время задачи!",
+          body: taskText,
+          schedule: { at: new Date(Date.now() + 500) },
+          sound: "default",
+          smallIcon: "ic_launcher",
+        },
+      ],
+    });
+    await sendServerPush("⏰ Время задачи!", taskText);
+  } else if (Notification.permission === "granted") {
+    new Notification("⏰ Время задачи!", {
+      body: taskText,
+      icon: "/favicon.ico",
+      tag: String(taskId),
+    });
+  }
+}
+
 async function checkAndNotify() {
   const now = new Date();
   const currentDate = now.toISOString().split("T")[0];
@@ -124,41 +211,16 @@ async function checkAndNotify() {
 
     markNotified(key);
 
-    const fireNotification = async () => {
-      playNotificationSound();
-      if (isNativeApp()) {
-        await LocalNotifications.schedule({
-          notifications: [
-            {
-              id: notifId++,
-              title: "⏰ Время задачи!",
-              body: task.text,
-              schedule: { at: new Date(Date.now() + 500) },
-              sound: "default",
-              smallIcon: "ic_launcher",
-            },
-          ],
-        });
-        await sendServerPush("⏰ Время задачи!", task.text);
-      } else if (Notification.permission === "granted") {
-        new Notification("⏰ Время задачи!", {
-          body: task.text,
-          icon: "/favicon.ico",
-          tag: String(task.id),
-        });
-      }
-    };
-
-    await fireNotification();
+    await fireNotificationByKey(key, task.text, task.id);
 
     if (!repeatIntervals.has(key)) {
       const repeat = setInterval(async () => {
-        if (document.visibilityState === "visible") {
+        if (activeAlert === null) {
           clearInterval(repeat);
           repeatIntervals.delete(key);
           return;
         }
-        await fireNotification();
+        await fireNotificationByKey(key, task.text, task.id);
       }, 60_000);
       repeatIntervals.set(key, repeat);
     }

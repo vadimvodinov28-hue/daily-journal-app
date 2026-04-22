@@ -5,6 +5,7 @@ import {
   CATEGORIES, PRIORITIES,
   type Task, type TaskPriority, type TaskCategory,
 } from "@/lib/tasks";
+import { subscribeToAlert, stopAlertSound, snoozeAlertSound, type ActiveAlert } from "@/lib/notifications";
 import DatePicker from "@/components/DatePicker";
 import TaskList from "@/components/TaskList";
 
@@ -35,6 +36,12 @@ export default function Home() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<AddForm>(EMPTY_FORM);
   const [filterCat, setFilterCat] = useState<TaskCategory | "all">("all");
+  const [activeAlert, setActiveAlert] = useState<ActiveAlert | null>(null);
+
+  useEffect(() => {
+    const unsub = subscribeToAlert(setActiveAlert);
+    return unsub;
+  }, []);
 
   const syncedTasks = allTasks.filter((t) => t.date === todayKey);
 
@@ -82,6 +89,34 @@ export default function Home() {
 
   return (
     <div className="px-6 py-8 max-w-lg mx-auto animate-fade-in">
+
+      {/* Alert banner */}
+      {activeAlert && (
+        <div className="mb-5 bg-foreground text-background rounded-2xl p-4 animate-scale-in">
+          <div className="flex items-center gap-2 mb-3">
+            <Icon name="BellRing" size={18} className="text-background animate-bounce" />
+            <span className="font-semibold text-sm">Время задачи!</span>
+          </div>
+          <p className="text-sm opacity-80 mb-4 line-clamp-2">{activeAlert.taskText}</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => snoozeAlertSound(5)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-background/20 hover:bg-background/30 text-background text-sm font-medium transition-all"
+            >
+              <Icon name="Clock" size={15} />
+              Отложить на 5 мин
+            </button>
+            <button
+              onClick={stopAlertSound}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-background text-foreground text-sm font-medium hover:bg-background/90 transition-all"
+            >
+              <Icon name="VolumeX" size={15} />
+              Отключить
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6">
         <p className="text-muted-foreground text-sm font-medium tracking-wide uppercase mb-1">
