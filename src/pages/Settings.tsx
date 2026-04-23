@@ -16,6 +16,7 @@ export default function Settings({ onLogout, onExport, userName }: Props) {
   const [startDay, setStartDay] = useState("Понедельник");
   const [name, setName] = useState(userName);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const fcmToken = localStorage.getItem("fcm_token");
 
   const Toggle = ({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) => (
     <button
@@ -65,6 +66,14 @@ export default function Settings({ onLogout, onExport, userName }: Props) {
             />
             <p className="text-xs text-muted-foreground mt-0.5">Нажми, чтобы изменить имя</p>
           </div>
+        </div>
+      </Section>
+
+      {/* FCM Debug */}
+      <Section title="Диагностика">
+        <div className="px-4 py-3">
+          <p className="text-xs text-muted-foreground mb-1">FCM токен:</p>
+          <p className="text-xs text-foreground break-all">{fcmToken ? fcmToken.slice(0, 40) + "..." : "❌ Токен не получен"}</p>
         </div>
       </Section>
 
