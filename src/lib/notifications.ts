@@ -126,7 +126,7 @@ async function setupWebFCM() {
 
     const swReg = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
 
-    const vapidKey = undefined;
+    const vapidKey = "BOX6lvkCgdLG8dWS0qb7OokjDn38DDHny-gOsf22bTlxXo3COHD2ymUo7usimaNpk6t1I1m1PlRRwtp3cX7Tz1Y";
     const token = await getToken(messaging, { serviceWorkerRegistration: swReg, vapidKey }).catch(() => null);
     if (token) {
       fcmToken = token;
