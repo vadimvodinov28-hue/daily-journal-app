@@ -130,6 +130,8 @@ def handler(event: dict, context) -> dict:
     rows = [(u, title, t, repeat, token) for u, title, t, repeat, token in reminder_rows] + \
            [(u, text, t, 'once', token) for u, text, t, token in task_rows]
 
+    print(f"time={current_time} reminders={len(reminder_rows)} tasks={len(task_rows)}")
+
     if not rows:
         return {"statusCode": 200, "headers": cors_headers, "body": json.dumps({"sent": 0, "time": current_time})}
 
