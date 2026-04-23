@@ -209,7 +209,12 @@ async function setupPushNotifications() {
   });
 
   const savedToken = localStorage.getItem("fcm_token");
-  if (savedToken) fcmToken = savedToken;
+  if (savedToken) {
+    fcmToken = savedToken;
+    const { getCurrentUser } = await import("@/lib/auth");
+    const user = getCurrentUser();
+    if (user) await syncTokenToServer(user.id, savedToken);
+  }
 }
 
 async function sendServerPush(title: string, body: string) {
