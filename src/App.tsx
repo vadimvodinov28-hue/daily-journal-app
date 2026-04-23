@@ -10,7 +10,7 @@ import AuthPage from "@/pages/AuthPage";
 import { ThemeProvider } from "@/lib/theme";
 import { getCurrentUser, logout, type User } from "@/lib/auth";
 import { getAllTasks } from "@/lib/tasks";
-import { startNotificationScheduler, stopNotificationScheduler, syncTasksToServer } from "@/lib/notifications";
+import { startNotificationScheduler, stopNotificationScheduler, syncTasksToServer, syncTokenToServer } from "@/lib/notifications";
 
 type Tab = "home" | "calendar" | "reminders" | "settings";
 
@@ -30,6 +30,10 @@ const App = () => {
       startNotificationScheduler();
       const tasks = getAllTasks();
       syncTasksToServer(user.id, tasks);
+      const savedToken = localStorage.getItem("fcm_token");
+      if (savedToken) {
+        setTimeout(() => syncTokenToServer(user.id, savedToken), 3000);
+      }
       return () => stopNotificationScheduler();
     }
   }, [user]);
