@@ -71,15 +71,16 @@ def send_fcm(token: str, title: str, body: str, project_id: str, access_token: s
 
 def should_fire_today(repeat: str, weekday: int) -> bool:
     """Проверить нужно ли отправить уведомление сегодня (weekday: 0=пн, 6=вс)"""
-    if repeat == "daily":
+    r = repeat.lower()
+    if r in ("daily", "каждый день"):
         return True
-    if repeat == "weekdays":
+    if r in ("weekdays", "по будням"):
         return weekday < 5
-    if repeat == "weekends":
+    if r in ("weekends", "по выходным"):
         return weekday >= 5
-    if repeat == "once":
+    if r in ("once", "однажды", "один раз"):
         return True
-    if repeat == "weekly":
+    if r in ("weekly", "каждую неделю"):
         return True
     return True
 
