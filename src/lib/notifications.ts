@@ -1,8 +1,20 @@
 import { getAllTasks } from "@/lib/tasks";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { PushNotifications } from "@capacitor/push-notifications";
+import { initializeApp, getApps } from "firebase/app";
+import { getMessaging, getToken, onMessage } from "firebase/messaging";
 
 const PUSH_URL = "https://functions.poehali.dev/54f28cce-8e3f-4cba-aca1-e7d83bb04799";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCekF_xNVSQ2bgLNN6H8_nuL4lUVgib-N4",
+  authDomain: "vivo-c9ef7.firebaseapp.com",
+  projectId: "vivo-c9ef7",
+  storageBucket: "vivo-c9ef7.firebasestorage.app",
+  messagingSenderId: "1020057072983",
+  appId: "1:1020057072983:web:aa4785924ed1c5f2f73a12",
+  measurementId: "G-51PN1WTTLL"
+};
 
 let schedulerInterval: ReturnType<typeof setInterval> | null = null;
 let audioContext: AudioContext | null = null;
@@ -106,8 +118,37 @@ function playNotificationSound() {
   }
 }
 
+async function setupWebFCM() {
+  try {
+    if (!("serviceWorker" in navigator)) return;
+    const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+    const messaging = getMessaging(app);
+
+    const swReg = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+
+    const vapidKey = undefined;
+    const token = await getToken(messaging, { serviceWorkerRegistration: swReg, vapidKey }).catch(() => null);
+    if (token) {
+      fcmToken = token;
+      localStorage.setItem("fcm_token", token);
+    }
+
+    onMessage(messaging, (payload) => {
+      const { title, body } = payload.notification || {};
+      if (Notification.permission === "granted") {
+        new Notification(title || "⏰ Напоминание", { body: body || "", icon: "/favicon.svg" });
+      }
+    });
+  } catch (e) {
+    console.warn("Web FCM setup failed:", e);
+  }
+}
+
 async function setupPushNotifications() {
-  if (!isNativeApp()) return;
+  if (!isNativeApp()) {
+    await setupWebFCM();
+    return;
+  }
 
   const permResult = await PushNotifications.requestPermissions();
   if (permResult.receive !== "granted") return;
