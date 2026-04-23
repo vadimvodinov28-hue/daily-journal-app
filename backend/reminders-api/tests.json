@@ -1,0 +1,19 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "No user id",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "save_token", "token": "test"},
+      "expectedStatus": 401,
+      "expectedBody": {"error": "X-User-Id required"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

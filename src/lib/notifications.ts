@@ -131,6 +131,9 @@ async function setupWebFCM() {
     if (token) {
       fcmToken = token;
       localStorage.setItem("fcm_token", token);
+      const { getCurrentUser } = await import("@/lib/auth");
+      const user = getCurrentUser();
+      if (user) await syncTokenToServer(user.id, token);
     }
 
     onMessage(messaging, (payload) => {
@@ -141,6 +144,32 @@ async function setupWebFCM() {
     });
   } catch (e) {
     console.warn("Web FCM setup failed:", e);
+  }
+}
+
+const REMINDERS_API = "https://functions.poehali.dev/da917894-007b-400f-88f3-605a4fd22d05";
+
+export async function syncTokenToServer(userId: string, token: string) {
+  try {
+    await fetch(REMINDERS_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-User-Id": userId },
+      body: JSON.stringify({ action: "save_token", token }),
+    });
+  } catch (e) {
+    console.warn("Token sync failed:", e);
+  }
+}
+
+export async function syncRemindersToServer(userId: string, reminders: Array<{id: number; title: string; time: string; repeat: string; enabled: boolean}>) {
+  try {
+    await fetch(REMINDERS_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-User-Id": userId },
+      body: JSON.stringify({ action: "sync_reminders", reminders }),
+    });
+  } catch (e) {
+    console.warn("Reminders sync failed:", e);
   }
 }
 
