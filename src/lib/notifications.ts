@@ -196,9 +196,12 @@ async function setupPushNotifications() {
 
   await PushNotifications.register();
 
-  PushNotifications.addListener("registration", (token) => {
+  PushNotifications.addListener("registration", async (token) => {
     fcmToken = token.value;
     localStorage.setItem("fcm_token", token.value);
+    const { getCurrentUser } = await import("@/lib/auth");
+    const user = getCurrentUser();
+    if (user) await syncTokenToServer(user.id, token.value);
   });
 
   PushNotifications.addListener("registrationError", (err) => {
