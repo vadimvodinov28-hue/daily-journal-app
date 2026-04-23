@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { useTheme } from "@/lib/theme";
 import { saveToStorage } from "@/lib/storage";
@@ -16,7 +16,15 @@ export default function Settings({ onLogout, onExport, userName }: Props) {
   const [startDay, setStartDay] = useState("Понедельник");
   const [name, setName] = useState(userName);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const fcmToken = localStorage.getItem("fcm_token");
+  const [fcmToken, setFcmToken] = useState<string | null>(localStorage.getItem("fcm_token"));
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const token = localStorage.getItem("fcm_token");
+      if (token) { setFcmToken(token); clearInterval(interval); }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const Toggle = ({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) => (
     <button
