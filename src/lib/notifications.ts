@@ -4,7 +4,7 @@ import { PushNotifications } from "@capacitor/push-notifications";
 import { initializeApp, getApps } from "firebase/app";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
 
-const PUSH_URL = "https://functions.poehali.dev/54f28cce-8e3f-4cba-aca1-e7d83bb04799";
+const PUSH_URL = "https://functions.poehali.dev/176c7e60-e14c-4ac9-95d0-f9561796eb04";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCekF_xNVSQ2bgLNN6H8_nuL4lUVgib-N4",
