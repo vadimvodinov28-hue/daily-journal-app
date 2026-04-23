@@ -1,4 +1,7 @@
 {
+  "reminder-scheduler": "https://functions.poehali.dev/56276fb7-fe60-4e82-8a3b-1331d130e014",
+  "reminders-api": "https://functions.poehali.dev/da917894-007b-400f-88f3-605a4fd22d05",
+  "send-push": "https://functions.poehali.dev/176c7e60-e14c-4ac9-95d0-f9561796eb04",
   "push": "https://functions.poehali.dev/54f28cce-8e3f-4cba-aca1-e7d83bb04799",
   "api": "https://functions.poehali.dev/bcafbe9f-a7af-4f7a-8919-ef3e2a63a57d"
 }

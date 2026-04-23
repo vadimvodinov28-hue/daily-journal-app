@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { loadFromStorage, saveToStorage } from "@/lib/storage";
+import { syncRemindersToServer } from "@/lib/notifications";
+import { getCurrentUser } from "@/lib/auth";
 
 const STORAGE_KEY = "reminders_data";
 
@@ -31,6 +33,16 @@ export default function Reminders() {
 
   useEffect(() => {
     saveToStorage(STORAGE_KEY, reminders);
+    const user = getCurrentUser();
+    if (user) {
+      syncRemindersToServer(user.id, reminders.map(r => ({
+        id: r.id,
+        title: r.title,
+        time: r.time,
+        repeat: r.repeat,
+        enabled: r.active,
+      })));
+    }
   }, [reminders]);
 
   const toggle = (id: number) =>
