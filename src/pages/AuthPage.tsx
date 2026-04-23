@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { saveUser, type User } from "@/lib/auth";
+import { syncTokenToServer } from "@/lib/notifications";
 
 interface Props {
   onAuth: (user: User) => void;
@@ -49,12 +50,16 @@ export default function AuthPage({ onAuth }: Props) {
         saveUsers([...users, newUser]);
         const authUser = { id: newUser.id, name: newUser.name, email: newUser.email };
         saveUser(authUser);
+        const t = localStorage.getItem("fcm_token");
+        if (t) syncTokenToServer(authUser.id, t);
         onAuth(authUser);
       } else {
         const found = users.find((u) => u.email === form.email.toLowerCase() && u.passwordHash === hash);
         if (!found) { setError("Неверный email или пароль"); setLoading(false); return; }
         const authUser = { id: found.id, name: found.name, email: found.email };
         saveUser(authUser);
+        const t = localStorage.getItem("fcm_token");
+        if (t) syncTokenToServer(authUser.id, t);
         onAuth(authUser);
       }
       setLoading(false);
