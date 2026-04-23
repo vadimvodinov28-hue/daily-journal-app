@@ -5,7 +5,8 @@ import {
   CATEGORIES, PRIORITIES,
   type Task, type TaskPriority, type TaskCategory,
 } from "@/lib/tasks";
-import { subscribeToAlert, stopAlertSound, snoozeAlertSound, type ActiveAlert } from "@/lib/notifications";
+import { subscribeToAlert, stopAlertSound, snoozeAlertSound, syncTasksToServer, type ActiveAlert } from "@/lib/notifications";
+import { getCurrentUser } from "@/lib/auth";
 import DatePicker from "@/components/DatePicker";
 import TaskList from "@/components/TaskList";
 
@@ -47,6 +48,8 @@ export default function Home() {
 
   useEffect(() => {
     saveTasks(allTasks);
+    const user = getCurrentUser();
+    if (user) syncTasksToServer(user.id, allTasks);
   }, [allTasks]);
 
   const dayName = DAYS_RU[todayDate.getDay()];

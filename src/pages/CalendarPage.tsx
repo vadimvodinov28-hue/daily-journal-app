@@ -7,6 +7,8 @@ import {
 } from "@/lib/tasks";
 import DatePicker from "@/components/DatePicker";
 import TaskList from "@/components/TaskList";
+import { syncTasksToServer } from "@/lib/notifications";
+import { getCurrentUser } from "@/lib/auth";
 
 const MONTHS_RU = [
   "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
@@ -53,6 +55,8 @@ export default function CalendarPage() {
 
   useEffect(() => {
     saveTasks(allTasks);
+    const user = getCurrentUser();
+    if (user) syncTasksToServer(user.id, allTasks);
   }, [allTasks]);
 
   const year = current.getFullYear();
