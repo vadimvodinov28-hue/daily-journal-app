@@ -10,7 +10,7 @@ import AuthPage from "@/pages/AuthPage";
 import { ThemeProvider } from "@/lib/theme";
 import { getCurrentUser, logout, type User } from "@/lib/auth";
 import { getAllTasks } from "@/lib/tasks";
-import { startNotificationScheduler, stopNotificationScheduler } from "@/lib/notifications";
+import { startNotificationScheduler, stopNotificationScheduler, syncTasksToServer } from "@/lib/notifications";
 
 type Tab = "home" | "calendar" | "reminders" | "settings";
 
@@ -28,6 +28,8 @@ const App = () => {
   useEffect(() => {
     if (user) {
       startNotificationScheduler();
+      const tasks = getAllTasks();
+      syncTasksToServer(user.id, tasks);
       return () => stopNotificationScheduler();
     }
   }, [user]);

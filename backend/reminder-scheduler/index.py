@@ -112,10 +112,22 @@ def handler(event: dict, context) -> dict:
             JOIN user_devices d ON r.user_id = d.user_id
             WHERE r.enabled = TRUE AND r.time = %s
         """, (current_time,))
-        rows = cur.fetchall()
+        reminder_rows = cur.fetchall()
+
+        today = moscow_now.strftime("%Y-%m-%d")
+        cur.execute("""
+            SELECT t.user_id, t.text, t.time, d.fcm_token
+            FROM user_tasks t
+            JOIN user_devices d ON t.user_id = d.user_id
+            WHERE t.done = FALSE AND t.time = %s AND t.date = %s
+        """, (current_time, today))
+        task_rows = cur.fetchall()
     finally:
         cur.close()
         conn.close()
+
+    rows = [(u, title, t, repeat, token) for u, title, t, repeat, token in reminder_rows] + \
+           [(u, text, t, 'once', token) for u, text, t, token in task_rows]
 
     if not rows:
         return {"statusCode": 200, "headers": cors_headers, "body": json.dumps({"sent": 0, "time": current_time})}

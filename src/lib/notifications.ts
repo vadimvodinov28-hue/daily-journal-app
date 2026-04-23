@@ -173,6 +173,18 @@ export async function syncRemindersToServer(userId: string, reminders: Array<{id
   }
 }
 
+export async function syncTasksToServer(userId: string, tasks: Array<{id: number; text: string; done: boolean; time: string; date: string; priority: string; category: string}>) {
+  try {
+    await fetch(REMINDERS_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-User-Id": userId },
+      body: JSON.stringify({ action: "sync_tasks", tasks }),
+    });
+  } catch (e) {
+    console.warn("Tasks sync failed:", e);
+  }
+}
+
 async function setupPushNotifications() {
   if (!isNativeApp()) {
     await setupWebFCM();

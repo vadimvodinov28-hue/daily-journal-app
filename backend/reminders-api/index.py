@@ -56,6 +56,24 @@ def handler(event: dict, context) -> dict:
             conn.commit()
             return {"statusCode": 200, "headers": cors_headers, "body": json.dumps({"success": True})}
 
+        elif method == "POST" and body.get("action") == "sync_tasks":
+            tasks = body.get("tasks", [])
+            cur.execute("DELETE FROM user_tasks WHERE user_id = %s", (user_id,))
+            for t in tasks:
+                if not t.get("time") or not t.get("date"):
+                    continue
+                cur.execute("""
+                    INSERT INTO user_tasks (user_id, task_id, text, done, time, date, priority, category)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (user_id, task_id) DO UPDATE SET
+                        text = EXCLUDED.text, done = EXCLUDED.done, time = EXCLUDED.time,
+                        date = EXCLUDED.date, priority = EXCLUDED.priority,
+                        category = EXCLUDED.category, updated_at = NOW()
+                """, (user_id, t.get("id"), t.get("text", ""), t.get("done", False),
+                      t.get("time", ""), t.get("date", ""), t.get("priority", "low"), t.get("category", "personal")))
+            conn.commit()
+            return {"statusCode": 200, "headers": cors_headers, "body": json.dumps({"success": True})}
+
         else:
             return {"statusCode": 400, "headers": cors_headers, "body": json.dumps({"error": "unknown action"})}
 
